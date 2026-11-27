@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LAB40 | Laboratório de Funcionalidades</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="hero"><div class="container">
+    <p class="eyebrow">AVALIAÇÃO PRÁTICA · CI/CD</p><h1>LAB40</h1>
+    <p>Laboratório de Funcionalidades Web</p>
+    <div class="stats"><span id="implemented-count">0 implementadas</span><span id="pending-count">40 pendentes</span></div>
+  </div></header>
+  <main class="container layout">
+    <section aria-labelledby="features-title">
+      <div class="section-heading"><div><p class="eyebrow">CATÁLOGO</p><h2 id="features-title">Funcionalidades</h2></div>
+      <input id="search" type="search" placeholder="Buscar funcionalidade..." aria-label="Buscar funcionalidade"></div>
+      <div id="feature-list" class="feature-grid" aria-live="polite"></div>
+    </section>
+    <aside class="panel" aria-labelledby="runner-title">
+      <p class="eyebrow">AMBIENTE DE EXECUÇÃO</p><h2 id="runner-title">Executar funcionalidade</h2>
+      <label for="feature-select">Funcionalidade</label><select id="feature-select"><option value="">Selecione uma funcionalidade</option></select>
+      <label for="input-json">Entrada JSON</label><textarea id="input-json" rows="8" spellcheck="false">{ "valor": 200, "percentual": 15 }</textarea>
+      <button id="run-button" type="button">Executar requisição</button>
+      <label for="output">Resposta da API</label><pre id="output" aria-live="polite">Selecione uma funcionalidade para começar.</pre>
+    </aside>
+  </main>
+  <footer class="container"><p>LAB40 · Projeto acadêmico para prática de integração e entrega contínua.</p></footer>
+</body>
+</html>

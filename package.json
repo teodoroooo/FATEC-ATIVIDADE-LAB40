@@ -1,0 +1,14 @@
+{
+  "name": "lab40",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicação-base para avaliação prática de CI/CD",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
