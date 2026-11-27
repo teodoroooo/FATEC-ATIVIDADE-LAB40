@@ -1,0 +1,111 @@
+# CD simulado: depois que o CI passa na main, gera a versão de entrega sem publicar em
+# servidor real. Saídas: imagem Docker com tag = SHA curto do commit, exportada em .tar,
+# e deployment-record.txt ligando commit, imagem e arquivo. Tudo fica como artefato do workflow.
+name: CD
+
+on:
+  # Só roda quando o CI termina na main. O job abaixo exige que o CI tenha passado.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Permite disparar manualmente pela aba Actions (botão "Run workflow").
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+jobs:
+  entrega:
+    name: Entrega simulada (imagem .tar + deployment-record)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # No workflow_run, o SHA é o do commit que o CI validou, não o último da main.
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Baixar exatamente o commit validado pelo CI
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+
+      - name: Definir nome, tag e arquivo da versão
+        run: |
+          SHORT_SHA="${COMMIT_SHA::7}"
+          echo "SHORT_SHA=$SHORT_SHA" >> "$GITHUB_ENV"
+          echo "IMAGE=lab40:$SHORT_SHA" >> "$GITHUB_ENV"
+          echo "TAR_FILE=lab40-$SHORT_SHA.tar" >> "$GITHUB_ENV"
+
+      - name: Configurar Node.js (para o smoke test)
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Build da imagem
+        run: docker build -t "$IMAGE" .
+
+      - name: Subir container e validar antes de entregar
+        env:
+          SMOKE_URL: http://localhost:3000
+        run: |
+          docker run -d --name lab40 -p 3000:3000 "$IMAGE"
+          echo "CONTAINER_ID=$(docker inspect -f '{{.Id}}' lab40 | cut -c1-12)" >> "$GITHUB_ENV"
+          node scripts/smoke.js
+          echo "HEALTH=$(curl -fsS http://localhost:3000/health)" >> "$GITHUB_ENV"
+
+      - name: Logs do container (se falhar)
+        if: failure()
+        run: docker logs lab40
+
+      - name: Remover container
+        if: always()
+        run: docker rm -f lab40 || true
+
+      - name: Exportar imagem para .tar
+        run: |
+          docker save -o "$TAR_FILE" "$IMAGE"
+          ls -lh "$TAR_FILE"
+
+      - name: Gerar deployment-record.txt
+        run: |
+          {
+            echo "LAB40 - Registro de entrega (CD simulado)"
+            echo "Funcionalidade:     23 - Filtro de números ímpares"
+            echo "Repositório:        $GITHUB_REPOSITORY"
+            echo "Branch:             main"
+            echo "Commit SHA:         $COMMIT_SHA"
+            echo "Imagem (nome:tag):  $IMAGE"
+            echo "Image ID:           $(docker image inspect -f '{{.Id}}' "$IMAGE")"
+            echo "Arquivo .tar:       $TAR_FILE"
+            echo "SHA-256 do .tar:    $(sha256sum "$TAR_FILE" | cut -d' ' -f1)"
+            echo "Container de teste: $CONTAINER_ID"
+            echo "Teste /health:      $HEALTH"
+            echo "Workflow:           $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Data (UTC):         $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Executado por:      $GITHUB_ACTOR"
+          } > deployment-record.txt
+          cat deployment-record.txt
+
+      - name: Mostrar o registro no resumo da execução
+        run: |
+          {
+            echo "## Entrega simulada: \`$IMAGE\`"
+            echo '```text'
+            cat deployment-record.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar artefato de entrega
+        uses: actions/upload-artifact@v7
+        with:
+          name: entrega-lab40-${{ env.SHORT_SHA }}
+          path: |
+            ${{ env.TAR_FILE }}
+            deployment-record.txt
+          retention-days: 14
+          if-no-files-found: error

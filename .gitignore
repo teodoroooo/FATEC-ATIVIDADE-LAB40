@@ -1,0 +1,20 @@
+node_modules/
+coverage/
+*.log
+.env
+.env.*
+lab40-image.tar*
+
+# Guias pessoais da atividade (não fazem parte da entrega).
+PASSO-A-PASSO.md
+RESPOSTAS-CHECKLIST.md
+
+# Ferramenta local de busca (graft), não faz parte do projeto.
+.ignore
+
+# Saídas do CD simulado, quando geradas localmente.
+lab40-*.tar
+deployment-record.txt
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

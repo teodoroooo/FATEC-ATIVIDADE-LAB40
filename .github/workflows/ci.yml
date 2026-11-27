@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Permissão mínima: o workflow só lê o código.
+permissions:
+  contents: read
+
+# Um push novo cancela a execução anterior do mesmo branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade:
+    name: Formatação, lint, testes, auditoria e smoke (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Configurar Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Instalar dependências (exatamente as do lockfile)
+        run: npm ci
+
+      - name: Verificação de formatação (Prettier)
+        run: npm run format:check
+
+      - name: Análise estática (ESLint)
+        run: npm run lint
+
+      - name: Testes unitários e de integração
+        run: npm test
+
+      - name: Auditoria de dependências
+        run: npm audit --audit-level=high
+
+      - name: Smoke test
+        run: npm run test:smoke
+
+  build:
+    name: Build e verificação da imagem Docker
+    needs: qualidade
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Configurar Node.js (para o smoke test)
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Build da imagem
+        run: docker build -t lab40:${{ github.sha }} .
+
+      - name: Subir container efêmero
+        run: docker run -d --name lab40 -p 3000:3000 lab40:${{ github.sha }}
+
+      - name: Smoke test contra o container
+        env:
+          SMOKE_URL: http://localhost:3000
+        run: node scripts/smoke.js
+
+      - name: Logs do container (se falhar)
+        if: failure()
+        run: docker logs lab40
+
+      - name: Remover container
+        if: always()
+        run: docker rm -f lab40
